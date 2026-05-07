@@ -2,7 +2,7 @@ module.exports = {
     name: 'hello',
     description: 'Bot się przywita',
     
-    async execute(message, args, client) {
-        await message.reply(`Cześć ${message.author.username}! 👋`);
+    async execute(interaction, client) {
+        await interaction.reply(`Cześć ${interaction.user.username}! 👋`);
     }
 };

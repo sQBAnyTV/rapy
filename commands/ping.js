@@ -2,9 +2,9 @@ module.exports = {
     name: 'ping',
     description: 'Sprawdza ping bota',
     
-    async execute(message, args, client) {
-        const sent = await message.reply('🏓 Pinging...');
-        const latency = sent.createdTimestamp - message.createdTimestamp;
-        await sent.edit(`🏓 Pong! ⏱️ ${latency}ms`);
+    async execute(interaction, client) {
+        const sent = await interaction.reply({ content: '🏓 Pinging...', fetchReply: true });
+        const latency = sent.createdTimestamp - interaction.createdTimestamp;
+        await interaction.editReply(`🏓 Pong! ⏱️ ${latency}ms`);
     }
 };

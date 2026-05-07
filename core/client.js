@@ -1,19 +1,19 @@
-const { Client, GatwayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection } = require('discord.js');
 
-function createClient() {
+function initializeBot() {
     const client = new Client({
         intents: [
-            GatwayIntentBits.Guilds,
-            GatwayIntentBits.GuildMessages,
-            GatwayIntentBits.MessageContent,
-            GatwayIntentBits.GuildMemebers
+            GatewayIntentBits.Guilds,
+            GatewayIntentBits.GuildMessages,
+            GatewayIntentBits.MessageContent,
+            GatewayIntentBits.GuildMembers
         ]
     });
-
+    
+    // Store dla komend
     client.commands = new Collection();
-    client.cooldowns = new Collection();
-
-    return client
+    
+    return client;
 }
 
-module.exports = { createClient }
+module.exports = { initializeBot };
