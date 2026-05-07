@@ -7,32 +7,39 @@ module.exports = {
         // Obsługujemy tylko komendy slash
         if (!interaction.isChatInputCommand()) return;
         
-        logger.info(`📩 Komenda: /${interaction.commandName} od ${interaction.user.tag}`);
+        logger.info(`📩 Komenda: /${interaction.commandName} od ${interaction.user?.tag || 'Nieznany'}`);
         
         const command = client.commands.get(interaction.commandName);
         
         if (!command) {
             logger.warn(`Nie znaleziono komendy: ${interaction.commandName}`);
-            await interaction.reply({ 
+            // Użyj flags zamiast ephemeral
+            return await interaction.reply({ 
                 content: '❌ Nie znaleziono komendy!', 
-                ephemeral: true 
+                flags: 64  // 64 = ephemeral (widoczne tylko dla użytkownika)
             });
-            return;
         }
         
         try {
+            // Wykonaj komendę
             await command.execute(interaction, client);
             logger.success(`Wykonano: /${interaction.commandName}`);
         } catch (error) {
             logger.error(`Błąd /${interaction.commandName}:`, error);
             
-            const errorMsg = error.message || 'Wystąpił błąd';
-            
+            // Sprawdź czy interakcja już nie została obsłużona
             if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: `❌ ${errorMsg}`, ephemeral: true });
-            } else {
-                await interaction.reply({ content: `❌ Błąd: ${errorMsg}`, ephemeral: true });
+                logger.warn(`Interakcja już obsłużona: /${interaction.commandName}`);
+                return;
             }
+            
+            // Wyślij błąd
+            const errorMessage = error.message || 'Nieznany błąd';
+            
+            await interaction.reply({ 
+                content: `❌ Błąd: ${errorMessage}\n\nSprawdź logi na Renderze.`, 
+                flags: 64
+            });
         }
     }
 };
