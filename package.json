@@ -1,0 +1,16 @@
+{
+  "name": "moj-bot-modularny",
+  "version": "1.0.0",
+  "description": "Modułowy bot Discord",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "node-cron": "^3.0.3"
+  }
+}
