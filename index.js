@@ -332,7 +332,7 @@ async function handleButton(interaction) {
             .addFields(
                 { name: 'Sprawdził', value: interaction.user.tag, inline: true },
                 { name: 'Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
-                { name: 'Werdict', value: '✅ Czysty', inline: true }
+                { name: 'Werdykt', value: '✅ Czysty', inline: true }
             )
             .setFooter({ text: 'System zgłoszeniowy' })
             .setTimestamp();
@@ -386,7 +386,7 @@ async function handleButton(interaction) {
             .addFields(
                 { name: 'Sprawdził', value: interaction.user.tag, inline: true },
                 { name: 'Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
-                { name: 'Werdict', value: '⚠️ Wykryto cheaty', inline: true }
+                { name: 'Werdykt', value: '⚠️ Wykryto cheaty', inline: true }
             )
             .setFooter({ text: 'System zgłoszeniowy' })
             .setTimestamp();
@@ -430,7 +430,7 @@ async function handleButton(interaction) {
         const userId = interaction.customId.split('_')[2];
         const reportData = client.tempReports.get(userId);
         
-        const verdictChannelId = '1501940107522085064';
+        const verdictChannelId = '1502426681317785751';
         const verdictChannel = interaction.guild.channels.cache.get(verdictChannelId);
         const roleId = '1501944547494727842';
         
@@ -441,7 +441,7 @@ async function handleButton(interaction) {
             .addFields(
                 { name: 'Sprawdził', value: interaction.user.tag, inline: true },
                 { name: 'Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
-                { name: 'Werdict', value: '✅ Czysty', inline: true }
+                { name: 'Werdykt', value: '✅ Czysty', inline: true }
             )
             .setFooter({ text: 'System backupowy' })
             .setTimestamp();
@@ -496,7 +496,7 @@ async function handleButton(interaction) {
             .addFields(
                 { name: 'Sprawdził', value: interaction.user.tag, inline: true },
                 { name: 'Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
-                { name: 'Werdict', value: '⚠️ Wykryto cheaty', inline: true }
+                { name: 'Werdykt', value: '⚠️ Wykryto cheaty', inline: true }
             )
             .setFooter({ text: 'System backupowy' })
             .setTimestamp();
