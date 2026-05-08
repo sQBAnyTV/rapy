@@ -295,13 +295,13 @@ async function handleModal(interaction) {
                 },
                 {
                     label: 'Gildie',
-                    description: 'Tryb Gildie,
+                    description: 'Tryb Gildie',
                     value: '🏠 Gildie',
                     emoji: '🏠'
                 },
                 {
                     label: 'Lifesteal',
-                    description: 'Tryb Lifesteal,
+                    description: 'Tryb Lifesteal',
                     value: '⚔️ Lifesteal',
                     emoji: '⚔️'
                 }
@@ -417,7 +417,7 @@ async function start() {
     
     const token = process.env.DISCORD_TOKEN;
     if (!token) {
-        console.error('❌ BRAK TOKENA!');
+        console.error('❌ A2!');
         process.exit(1);
     }
     
