@@ -476,7 +476,7 @@ if (interaction.customId.startsWith('mode_backup_')) {
         const userId = interaction.customId.split('_')[2];
         const reportData = client.tempReports.get(userId);
         
-        const verdictChannelId = '1501940107522085064';
+        const verdictChannelId = '1502426681317785751';
         const verdictChannel = interaction.guild.channels.cache.get(verdictChannelId);
         const roleId = '1501944547494727842';
         
