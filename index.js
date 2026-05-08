@@ -607,12 +607,15 @@ async function handleModal(interaction) {
     return false;
 }
 
-// ========== TWORZENIE PANELU ZGŁOSZEŃ ==========
+// ========== TWORZENIE PANELU ZGŁOSZEŃ (POPRAWIENIE BŁĘDU INTERAKCJI) ==========
 async function createReportPanel(interaction) {
     const allowedUserId = '1384938445394149406';
     
+    // DEFER – zyskujemy czas na przetworzenie
+    await interaction.deferReply({ flags: 64 });
+    
     if (interaction.user.id !== allowedUserId) {
-        return await interaction.reply({
+        return await interaction.editReply({
             content: '❌ Nie masz uprawnień do użycia tej komendy!',
             flags: 64
         });
@@ -623,9 +626,7 @@ async function createReportPanel(interaction) {
         .setTitle('📝 System zgłoszeń graczy')
         .setDescription('Kliknij w odpowiedni przycisk poniżej, aby zgłosić gracza.\n\n**Zasady zgłoszeń:**\n• Podaj nick gracza\n• Wybierz odpowiedni tryb\n• Opisz powód\n• Dołącz dowody (opcjonalnie)\n\n**Weryfikacja:**\n• Admini sprawdzą zgłoszenie\n• Wybiorą werdykt: CZYSTY lub WYKRYTO CHEATY\n• Zgłoszenie auto-usunie się po 7 dniach')
         .addFields(
-            { name: '📌 Ważne', value: 'Fałszywe zgłoszenia będą karane!', inline: false },
             { name: '🎮 Tryby', value: '🌍 Earth | 🏠 Gildie | ⚔️ Lifesteal', inline: true },
-            { name: '⏱️ Czas odpowiedzi', value: 'Do 24 godzin', inline: true },
             { name: '📅 Auto-usunięcie', value: 'Po 7 dniach', inline: true }
         )
         .setFooter({ text: 'System zgłoszeniowy • v2.0' })
@@ -635,17 +636,17 @@ async function createReportPanel(interaction) {
         .addComponents(
             new ButtonBuilder()
                 .setCustomId('report_player')
-                .setLabel('📝 Zgłoś gracza')
+                .setLabel('Zgłoś gracza')
                 .setStyle(ButtonStyle.Primary)
                 .setEmoji('📋'),
             new ButtonBuilder()
                 .setCustomId('report_backup')
-                .setLabel('📦 Backup')
+                .setLabel('Backup')
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji('💾')
         );
     
-    await interaction.reply({
+    await interaction.editReply({
         embeds: [embed],
         components: [row]
     });
