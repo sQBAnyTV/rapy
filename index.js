@@ -617,7 +617,6 @@ async function createReportPanel(interaction) {
     if (interaction.user.id !== allowedUserId) {
         return await interaction.editReply({
             content: '❌ Nie masz uprawnień do użycia tej komendy!',
-            flags: 64
         });
     }
     
