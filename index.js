@@ -55,7 +55,7 @@ async function loadCommands() {
 async function handleButton(interaction) {
     if (!interaction.isButton()) return false;
     
-    // Przycisk zgłoszenia gracza
+    // Przycisk zgłoszenia gracza (zwykłe)
     if (interaction.customId === 'report_player') {
         const modal = new ModalBuilder()
             .setCustomId('report_modal')
@@ -95,13 +95,52 @@ async function handleButton(interaction) {
         return true;
     }
     
-    // Obsługa wyboru trybu (PRZYCISKI)
-    if (interaction.customId.startsWith('mode_')) {
+    // Przycisk zgłoszenia BACKUP
+    if (interaction.customId === 'report_backup') {
+        const modal = new ModalBuilder()
+            .setCustomId('report_modal_backup')
+            .setTitle('📦 Zgłoś gracza - Backup');
+        
+        const nickInput = new TextInputBuilder()
+            .setCustomId('player_nick')
+            .setLabel('🎮 Nick gracza')
+            .setPlaceholder('Wpisz nick gracza...')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMinLength(3)
+            .setMaxLength(32);
+        
+        const reasonInput = new TextInputBuilder()
+            .setCustomId('report_reason')
+            .setLabel('📋 Powód zgłoszenia')
+            .setPlaceholder('Opisz co się stało...')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(1000);
+        
+        const proofInput = new TextInputBuilder()
+            .setCustomId('report_proof')
+            .setLabel('🔗 Dowód (opcjonalnie)')
+            .setPlaceholder('Link do screenu, filmu lub innego dowodu...')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false);
+        
+        const firstRow = new ActionRowBuilder().addComponents(nickInput);
+        const secondRow = new ActionRowBuilder().addComponents(reasonInput);
+        const thirdRow = new ActionRowBuilder().addComponents(proofInput);
+        
+        modal.addComponents(firstRow, secondRow, thirdRow);
+        
+        await interaction.showModal(modal);
+        return true;
+    }
+    
+    // Obsługa wyboru trybu (zwykłe zgłoszenie)
+    if (interaction.customId.startsWith('mode_') && !interaction.customId.startsWith('mode_backup_')) {
         const parts = interaction.customId.split('_');
         const selectedModeRaw = parts[1];
         const userId = parts[2];
         
-        // Sprawdź czy to ten sam użytkownik
         if (interaction.user.id !== userId) {
             await interaction.reply({
                 content: '❌ Nie możesz wybrać trybu dla cudzego zgłoszenia!',
@@ -110,25 +149,12 @@ async function handleButton(interaction) {
             return true;
         }
         
-        // Mapuj nazwę trybu
-        let selectedMode;
-        let modeEmoji;
+        let selectedMode, modeEmoji;
         switch(selectedModeRaw) {
-            case 'earth': 
-                selectedMode = 'Earth'; 
-                modeEmoji = '🌍';
-                break;
-            case 'gildie': 
-                selectedMode = 'Gildie'; 
-                modeEmoji = '🏠';
-                break;
-            case 'lifesteal': 
-                selectedMode = 'Lifesteal'; 
-                modeEmoji = '⚔️';
-                break;
-            default: 
-                selectedMode = 'Nieznany';
-                modeEmoji = '❓';
+            case 'earth': selectedMode = 'Earth'; modeEmoji = '🌍'; break;
+            case 'gildie': selectedMode = 'Gildie'; modeEmoji = '🏠'; break;
+            case 'lifesteal': selectedMode = 'Lifesteal'; modeEmoji = '⚔️'; break;
+            default: selectedMode = 'Nieznany'; modeEmoji = '❓';
         }
         
         const fullModeName = `${modeEmoji} ${selectedMode}`;
@@ -146,37 +172,16 @@ async function handleButton(interaction) {
         const targetChannelId = '1501940360744669325';
         const targetChannel = interaction.guild.channels.cache.get(targetChannelId);
         
-        // Przygotuj embed
         const reportEmbed = new EmbedBuilder()
             .setColor(0xFFA500)
             .setTitle('📋 Oczekiwanie na sprawdzenie')
             .setDescription(`**Tryb:** ${fullModeName}\n**Nick:** ${reportData.playerNick}`)
             .addFields(
-                { 
-                    name: '❌ Wystawił', 
-                    value: `${interaction.user} (${interaction.user.username})`, 
-                    inline: true 
-                },
-                { 
-                    name: '📋 Powód', 
-                    value: reportData.reason, 
-                    inline: false 
-                },
-                { 
-                    name: '🔍 Status', 
-                    value: '⏳ Oczekuje na weryfikację', 
-                    inline: true 
-                },
-                { 
-                    name: '🕐 Data', 
-                    value: `<t:${Math.floor(Date.now() / 1000)}:F>`, 
-                    inline: true 
-                },
-                { 
-                    name: '📅 Auto-usunięcie', 
-                    value: `<t:${Math.floor((Date.now() + 7 * 24 * 60 * 60 * 1000) / 1000)}:F>`, 
-                    inline: true 
-                }
+                { name: '❌ Wystawił', value: `${interaction.user} (${interaction.user.username})`, inline: true },
+                { name: '📋 Powód', value: reportData.reason, inline: false },
+                { name: '🔍 Status', value: '⏳ Oczekuje na weryfikację', inline: true },
+                { name: '🕐 Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
+                { name: '📅 Auto-usunięcie', value: `<t:${Math.floor((Date.now() + 7 * 24 * 60 * 60 * 1000) / 1000)}:F>`, inline: true }
             )
             .setFooter({ text: 'System zgłoszeniowy • Auto-usunie się za 7 dni' })
             .setTimestamp();
@@ -185,26 +190,17 @@ async function handleButton(interaction) {
             reportEmbed.addFields({ name: '🔗 Dowód', value: reportData.proof, inline: false });
         }
         
-        // Przyciski dla adminów
         const adminRow = new ActionRowBuilder()
             .addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`clean_${interaction.user.id}`)
-                    .setLabel('✅ Czysty')
-                    .setStyle(ButtonStyle.Success),
-                new ButtonBuilder()
-                    .setCustomId(`cheats_${interaction.user.id}`)
-                    .setLabel('⚠️ Wykryto cheaty')
-                    .setStyle(ButtonStyle.Danger)
+                new ButtonBuilder().setCustomId(`clean_${interaction.user.id}`).setLabel('✅ Czysty').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId(`cheats_${interaction.user.id}`).setLabel('⚠️ Wykryto cheaty').setStyle(ButtonStyle.Danger)
             );
         
-        // ODPOWIEDZ UŻYTKOWNIKOWI - Z NICKIEM ZGŁOSZONEGO GRACZA
         await interaction.reply({
             content: `✅ **Zgłoszenie gracza ${reportData.playerNick} zostało wysłane!**\n\n**Podsumowanie:**\n🎮 Zgłoszony: ${reportData.playerNick}\n🎯 Tryb: ${fullModeName}\n📋 Powód: ${reportData.reason}\n\nAdmini wkrótce sprawdzą zgłoszenie.`,
             flags: 64
         });
         
-        // Wyślij na kanał zgłoszeń
         if (targetChannel) {
             try {
                 const sentMessage = await targetChannel.send({
@@ -213,7 +209,6 @@ async function handleButton(interaction) {
                     components: [adminRow]
                 });
                 
-                // Automatyczne usunięcie po 7 dniach
                 setTimeout(async () => {
                     try {
                         await sentMessage.delete();
@@ -227,11 +222,83 @@ async function handleButton(interaction) {
             } catch (error) {
                 console.error('❌ Błąd wysyłania na kanał:', error);
             }
-        } else {
-            console.error(`❌ Nie znaleziono kanału ${targetChannelId}`);
         }
         
-        // NIE USUWAMY DANYCH - zostają do momentu wydania werdyktu
+        return true;
+    }
+    
+    // Obsługa wyboru trybu dla BACKUP
+    if (interaction.customId.startsWith('mode_backup_')) {
+        const parts = interaction.customId.split('_');
+        const selectedModeRaw = parts[2];
+        const userId = parts[3];
+        
+        if (interaction.user.id !== userId) {
+            await interaction.reply({
+                content: '❌ Nie możesz wybrać trybu dla cudzego zgłoszenia!',
+                flags: 64
+            });
+            return true;
+        }
+        
+        let selectedMode, modeEmoji;
+        switch(selectedModeRaw) {
+            case 'earth': selectedMode = 'Earth'; modeEmoji = '🌍'; break;
+            case 'gildie': selectedMode = 'Gildie'; modeEmoji = '🏠'; break;
+            case 'lifesteal': selectedMode = 'Lifesteal'; modeEmoji = '⚔️'; break;
+            default: selectedMode = 'Nieznany'; modeEmoji = '❓';
+        }
+        
+        const fullModeName = `${modeEmoji} ${selectedMode}`;
+        const reportData = client.tempReports.get(interaction.user.id);
+        
+        if (!reportData) {
+            await interaction.reply({
+                content: '❌ Nie znaleziono danych zgłoszenia. Spróbuj ponownie.',
+                flags: 64
+            });
+            return true;
+        }
+        
+        // KANAŁ DOCELOWY DLA BACKUP
+        const targetChannelId = '1501940107522085064';
+        const targetChannel = interaction.guild.channels.cache.get(targetChannelId);
+        const roleId = '1501944547494727842';
+        
+        const reportEmbed = new EmbedBuilder()
+            .setColor(0x9B59B6)
+            .setTitle('📦 Zgłoszenie BACKUP')
+            .setDescription(`**Tryb:** ${fullModeName}\n**Nick:** ${reportData.playerNick}`)
+            .addFields(
+                { name: '❌ Wystawił', value: `${interaction.user} (${interaction.user.username})`, inline: true },
+                { name: '📋 Powód', value: reportData.reason, inline: false },
+                { name: '🕐 Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
+            )
+            .setFooter({ text: 'System backupowy • Zgłoszenie wymaga sprawdzenia' })
+            .setTimestamp();
+        
+        if (reportData.proof && reportData.proof !== 'Brak dowodu') {
+            reportEmbed.addFields({ name: '🔗 Dowód', value: reportData.proof, inline: false });
+        }
+        
+        await interaction.reply({
+            content: `✅ **Zgłoszenie BACKUP gracza ${reportData.playerNick} zostało wysłane!**\n\n**Podsumowanie:**\n🎮 Zgłoszony: ${reportData.playerNick}\n🎯 Tryb: ${fullModeName}\n📋 Powód: ${reportData.reason}\n\nOsoby odpowiedzialne za backup wkrótce sprawdzą zgłoszenie.`,
+            flags: 64
+        });
+        
+        if (targetChannel) {
+            try {
+                await targetChannel.send({
+                    content: `<@&${roleId}> 📦 **NOWE ZGŁOSZENIE BACKUP**`,
+                    embeds: [reportEmbed]
+                });
+                console.log(`✅ Zgłoszenie BACKUP wysłane na kanał ${targetChannelId} i pingnięto rolę ${roleId}`);
+            } catch (error) {
+                console.error('❌ Błąd wysyłania na kanał backup:', error);
+            }
+        }
+        
+        client.tempReports.delete(interaction.user.id);
         return true;
     }
     
@@ -240,11 +307,9 @@ async function handleButton(interaction) {
         const userId = interaction.customId.split('_')[1];
         const reportData = client.tempReports.get(userId);
         
-        // Kanał do wysyłania werdyktu
         const verdictChannelId = '1502426681317785751';
         const verdictChannel = interaction.guild.channels.cache.get(verdictChannelId);
         
-        // Przygotuj embed dla kanału werdyktów
         const verdictEmbed = new EmbedBuilder()
             .setColor(0x00FF00)
             .setTitle('✅ Zgłoszenie zweryfikowane')
@@ -257,31 +322,18 @@ async function handleButton(interaction) {
             .setFooter({ text: 'System zgłoszeniowy' })
             .setTimestamp();
         
-        // Wyślij na kanał werdyktów i pingnij zgłaszającego
         if (verdictChannel && reportData) {
             await verdictChannel.send({
                 content: `<@${reportData.reporterId}>, Twoje zgłoszenie gracza **${reportData.playerNick}** zostało sprawdzone!`,
                 embeds: [verdictEmbed]
             });
-            console.log(`✅ Werdykt wysłany na kanał ${verdictChannelId} i pingnięto ${reportData.reporterTag}`);
-        } else if (verdictChannel) {
-            await verdictChannel.send({
-                content: `⚠️ Nie znaleziono danych zgłaszającego.`,
-                embeds: [verdictEmbed]
-            });
-        } else {
-            console.error(`❌ Nie znaleziono kanału ${verdictChannelId}`);
+            console.log(`✅ Werdykt wysłany na kanał ${verdictChannelId}`);
         }
         
-        // Odpowiedź dla admina który kliknął przycisk
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ 
-                content: `✅ Werdykt "Czysty" został wysłany!`, 
-                flags: 64 
-            });
+            await interaction.reply({ content: `✅ Werdykt "Czysty" został wysłany!`, flags: 64 });
         }
         
-        // Zmień orginalny embed na kanale zgłoszeń
         try {
             const originalEmbed = interaction.message.embeds[0];
             const updatedEmbed = EmbedBuilder.from(originalEmbed)
@@ -300,7 +352,6 @@ async function handleButton(interaction) {
             console.error('❌ Błąd edycji embeda:', error);
         }
         
-        // Usuń dane zgłoszenia dopiero po wydaniu werdyktu
         client.tempReports.delete(userId);
         return true;
     }
@@ -310,11 +361,9 @@ async function handleButton(interaction) {
         const userId = interaction.customId.split('_')[1];
         const reportData = client.tempReports.get(userId);
         
-        // Kanał do wysyłania werdyktu
         const verdictChannelId = '1502426681317785751';
         const verdictChannel = interaction.guild.channels.cache.get(verdictChannelId);
         
-        // Przygotuj embed dla kanału werdyktów
         const verdictEmbed = new EmbedBuilder()
             .setColor(0xFF0000)
             .setTitle('⚠️ Zgłoszenie zweryfikowane')
@@ -327,31 +376,18 @@ async function handleButton(interaction) {
             .setFooter({ text: 'System zgłoszeniowy' })
             .setTimestamp();
         
-        // Wyślij na kanał werdyktów i pingnij zgłaszającego
         if (verdictChannel && reportData) {
             await verdictChannel.send({
                 content: `<@${reportData.reporterId}>, Twoje zgłoszenie gracza **${reportData.playerNick}** zostało sprawdzone!`,
                 embeds: [verdictEmbed]
             });
-            console.log(`✅ Werdykt wysłany na kanał ${verdictChannelId} i pingnięto ${reportData.reporterTag}`);
-        } else if (verdictChannel) {
-            await verdictChannel.send({
-                content: `⚠️ Nie znaleziono danych zgłaszającego.`,
-                embeds: [verdictEmbed]
-            });
-        } else {
-            console.error(`❌ Nie znaleziono kanału ${verdictChannelId}`);
+            console.log(`✅ Werdykt wysłany na kanał ${verdictChannelId}`);
         }
         
-        // Odpowiedź dla admina który kliknął przycisk
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ 
-                content: `⚠️ Werdykt "Wykryto cheaty" został wysłany!`, 
-                flags: 64 
-            });
+            await interaction.reply({ content: `⚠️ Werdykt "Wykryto cheaty" został wysłany!`, flags: 64 });
         }
         
-        // Zmień orginalny embed na kanale zgłoszeń
         try {
             const originalEmbed = interaction.message.embeds[0];
             const updatedEmbed = EmbedBuilder.from(originalEmbed)
@@ -370,7 +406,6 @@ async function handleButton(interaction) {
             console.error('❌ Błąd edycji embeda:', error);
         }
         
-        // Usuń dane zgłoszenia dopiero po wydaniu werdyktu
         client.tempReports.delete(userId);
         return true;
     }
@@ -382,40 +417,62 @@ async function handleButton(interaction) {
 async function handleModal(interaction) {
     if (!interaction.isModalSubmit()) return false;
     
+    // Zwykły modal
     if (interaction.customId === 'report_modal') {
         const playerNick = interaction.fields.getTextInputValue('player_nick');
         const reason = interaction.fields.getTextInputValue('report_reason');
         const proof = interaction.fields.getTextInputValue('report_proof') || 'Brak dowodu';
         
-        // Zapisz dane zgłoszenia wraz z ID zgłaszającego
         client.tempReports.set(interaction.user.id, {
             playerNick,
             reason,
             proof,
             reporterId: interaction.user.id,
             reporterTag: interaction.user.tag,
+            type: 'normal',
             timestamp: Date.now()
         });
         
-        // Przyciski do wyboru trybu
         const row = new ActionRowBuilder()
             .addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`mode_earth_${interaction.user.id}`)
-                    .setLabel('🌍 Earth')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId(`mode_gildie_${interaction.user.id}`)
-                    .setLabel('🏠 Gildie')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId(`mode_lifesteal_${interaction.user.id}`)
-                    .setLabel('⚔️ Lifesteal')
-                    .setStyle(ButtonStyle.Primary)
+                new ButtonBuilder().setCustomId(`mode_earth_${interaction.user.id}`).setLabel('🌍 Earth').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`mode_gildie_${interaction.user.id}`).setLabel('🏠 Gildie').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`mode_lifesteal_${interaction.user.id}`).setLabel('⚔️ Lifesteal').setStyle(ButtonStyle.Primary)
             );
         
         await interaction.reply({
             content: `📝 **Podsumowanie zgłoszenia:**\n\n🎮 **Zgłoszony gracz:** ${playerNick}\n📋 **Powód:** ${reason}\n🔗 **Dowód:** ${proof}\n\n⬇️ **Kliknij w przycisk aby wybrać tryb gry:**`,
+            components: [row],
+            flags: 64
+        });
+        return true;
+    }
+    
+    // Backup modal
+    if (interaction.customId === 'report_modal_backup') {
+        const playerNick = interaction.fields.getTextInputValue('player_nick');
+        const reason = interaction.fields.getTextInputValue('report_reason');
+        const proof = interaction.fields.getTextInputValue('report_proof') || 'Brak dowodu';
+        
+        client.tempReports.set(interaction.user.id, {
+            playerNick,
+            reason,
+            proof,
+            reporterId: interaction.user.id,
+            reporterTag: interaction.user.tag,
+            type: 'backup',
+            timestamp: Date.now()
+        });
+        
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder().setCustomId(`mode_backup_earth_${interaction.user.id}`).setLabel('🌍 Earth').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`mode_backup_gildie_${interaction.user.id}`).setLabel('🏠 Gildie').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId(`mode_backup_lifesteal_${interaction.user.id}`).setLabel('⚔️ Lifesteal').setStyle(ButtonStyle.Primary)
+            );
+        
+        await interaction.reply({
+            content: `📦 **Podsumowanie zgłoszenia BACKUP:**\n\n🎮 **Zgłoszony gracz:** ${playerNick}\n📋 **Powód:** ${reason}\n🔗 **Dowód:** ${proof}\n\n⬇️ **Kliknij w przycisk aby wybrać tryb gry:**`,
             components: [row],
             flags: 64
         });
@@ -439,7 +496,7 @@ async function createReportPanel(interaction) {
     const embed = new EmbedBuilder()
         .setColor(0x2b2d31)
         .setTitle('📝 System zgłoszeń graczy')
-        .setDescription('Kliknij w przycisk poniżej, aby zgłosić gracza.\n\n**Zasady zgłoszeń:**\n• Podaj nick gracza\n• Wybierz odpowiedni tryb\n• Opisz powód\n• Dołącz dowody (opcjonalnie)\n\n**Weryfikacja:**\n• Admini sprawdzą zgłoszenie\n• Wybiorą werdykt: CZYSTY lub WYKRYTO CHEATY\n• Zgłoszenie auto-usunie się po 7 dniach')
+        .setDescription('Kliknij w odpowiedni przycisk poniżej, aby zgłosić gracza.\n\n**Zasady zgłoszeń:**\n• Podaj nick gracza\n• Wybierz odpowiedni tryb\n• Opisz powód\n• Dołącz dowody (opcjonalnie)\n\n**Weryfikacja:**\n• Admini sprawdzą zgłoszenie\n• Wybiorą werdykt: CZYSTY lub WYKRYTO CHEATY\n• Zgłoszenie auto-usunie się po 7 dniach')
         .addFields(
             { name: '🎮 Tryby', value: '🌍 Earth | 🏠 Gildie | ⚔️ Lifesteal', inline: true },
             { name: '📅 Auto-usunięcie', value: 'Po 7 dniach', inline: true }
@@ -453,7 +510,12 @@ async function createReportPanel(interaction) {
                 .setCustomId('report_player')
                 .setLabel('📝 Zgłoś gracza')
                 .setStyle(ButtonStyle.Primary)
-                .setEmoji('📋')
+                .setEmoji('📋'),
+            new ButtonBuilder()
+                .setCustomId('report_backup')
+                .setLabel('📦 Backup')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('💾')
         );
     
     await interaction.reply({
@@ -474,7 +536,6 @@ client.once('ready', () => {
 // ========== OBSŁUGA INTERAKCJI ==========
 client.on('interactionCreate', async (interaction) => {
     try {
-        // Obsługa komend slash
         if (interaction.isChatInputCommand()) {
             const command = client.commands.get(interaction.commandName);
             
@@ -494,11 +555,9 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
         
-        // Obsługa przycisków
         const buttonHandled = await handleButton(interaction);
         if (buttonHandled) return;
         
-        // Obsługa modalów
         const modalHandled = await handleModal(interaction);
         if (modalHandled) return;
         
