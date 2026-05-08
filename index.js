@@ -32,20 +32,6 @@ const client = new Client({
 client.commands = new Collection();
 client.tempReports = new Map(); // Do przechowywania tymczasowych zgłoszeń
 
-// ========== FUNKCJA DO AUTOMATYCZNEGO USUWANIA PO 7 DNIACH ==========
-async function scheduleAutoDelete(message, days = 7) {
-    const msToDelete = days * 24 * 60 * 60 * 1000;
-    
-    setTimeout(async () => {
-        try {
-            await message.delete();
-            console.log(`🗑️ Automatycznie usunięto wiadomość po ${days} dniach`);
-        } catch (error) {
-            console.error('❌ Błąd podczas automatycznego usuwania:', error);
-        }
-    }, msToDelete);
-}
-
 // ========== ŁADOWANIE KOMEND ==========
 async function loadCommands() {
     const commandsPath = path.join(__dirname, 'commands');
@@ -91,7 +77,6 @@ async function handleButton(interaction) {
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(true)
             .setMaxLength(1000);
-            // USUNIĘTO minimalną ilość znaków
         
         const proofInput = new TextInputBuilder()
             .setCustomId('report_proof')
@@ -167,7 +152,7 @@ async function handleButton(interaction) {
             reportEmbed.addFields({ name: '🔗 Dowód', value: reportData.proof, inline: false });
         }
         
-        // Przyciski akcji - teraz tylko dwa: Czysty i Cheaty
+        // Przyciski akcji
         const row = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
@@ -180,25 +165,36 @@ async function handleButton(interaction) {
                     .setStyle(ButtonStyle.Danger)
             );
         
-        // Wyślij na konkretny kanał
+        // NAJPIERW ODPOWIEDZ UŻYTKOWNIKOWI
+        await interaction.reply({
+            content: `✅ **Przetwarzanie zgłoszenia...**\n\nTwoje zgłoszenie zostało przyjęte. Admini wkrótce je sprawdzą.\n\n**Podsumowanie:**\n🎮 Nick: ${reportData.playerNick}\n🎯 Tryb: ${selectedMode}\n📋 Powód: ${reportData.reason}`,
+            flags: 64
+        });
+        
+        // POTEM wyślij na kanał
         if (targetChannel) {
-            const sentMessage = await targetChannel.send({
-                embeds: [reportEmbed],
-                components: [row]
-            });
-            
-            // Automatyczne usunięcie po 7 dniach
-            await scheduleAutoDelete(sentMessage, 7);
-            
-            await interaction.reply({
-                content: `✅ Zgłoszenie zostało wysłane na kanał <#${targetChannelId}>!\n\n**Podsumowanie:**\n🎮 Nick: ${reportData.playerNick}\n🎯 Tryb: ${selectedMode}\n📋 Powód: ${reportData.reason}\n📅 Zgłoszenie automatycznie usunie się za 7 dni.`,
-                flags: 64
-            });
+            try {
+                const sentMessage = await targetChannel.send({
+                    embeds: [reportEmbed],
+                    components: [row]
+                });
+                
+                // Automatyczne usunięcie po 7 dniach
+                setTimeout(async () => {
+                    try {
+                        await sentMessage.delete();
+                        console.log(`🗑️ Automatycznie usunięto zgłoszenie po 7 dniach`);
+                    } catch (e) {
+                        console.error('Błąd usuwania:', e);
+                    }
+                }, 7 * 24 * 60 * 60 * 1000);
+                
+                console.log(`✅ Zgłoszenie wysłane na kanał ${targetChannelId}`);
+            } catch (error) {
+                console.error('❌ Błąd wysyłania na kanał:', error);
+            }
         } else {
-            await interaction.reply({
-                content: `❌ Nie znaleziono kanału o ID ${targetChannelId}! Zgłoszenie nie zostało wysłane.`,
-                flags: 64
-            });
+            console.error(`❌ Nie znaleziono kanału ${targetChannelId}`);
         }
         
         // Wyczyść tymczasowe dane
@@ -208,8 +204,6 @@ async function handleButton(interaction) {
     
     // Obsługa przycisku "Czysty"
     if (interaction.customId.startsWith('clean_')) {
-        const userId = interaction.customId.split('_')[1];
-        
         const cleanEmbed = new EmbedBuilder()
             .setColor(0x00FF00)
             .setTitle('✅ Zgłoszenie zweryfikowane')
@@ -224,7 +218,7 @@ async function handleButton(interaction) {
         
         await interaction.reply({ embeds: [cleanEmbed] });
         
-        // Zmień kolor embeda na zielony i usuń przyciski
+        // Zmień embed
         const originalEmbed = interaction.message.embeds[0];
         const updatedEmbed = EmbedBuilder.from(originalEmbed)
             .setColor(0x00FF00)
@@ -237,8 +231,6 @@ async function handleButton(interaction) {
     
     // Obsługa przycisku "Wykryto cheaty"
     if (interaction.customId.startsWith('cheats_')) {
-        const userId = interaction.customId.split('_')[1];
-        
         const cheatsEmbed = new EmbedBuilder()
             .setColor(0xFF0000)
             .setTitle('⚠️ Zgłoszenie zweryfikowane')
@@ -253,7 +245,7 @@ async function handleButton(interaction) {
         
         await interaction.reply({ embeds: [cheatsEmbed] });
         
-        // Zmień kolor embeda na czerwony i usuń przyciski
+        // Zmień embed
         const originalEmbed = interaction.message.embeds[0];
         const updatedEmbed = EmbedBuilder.from(originalEmbed)
             .setColor(0xFF0000)
@@ -334,10 +326,11 @@ async function createReportPanel(interaction) {
     const embed = new EmbedBuilder()
         .setColor(0x2b2d31)
         .setTitle('📝 System zgłoszeń graczy')
-        .setDescription('Kliknij w przycisk poniżej, aby zgłosić gracza.\n\n**Zasady zgłoszeń:**\n• Podaj nick gracza lub incognito\n• Wybierz odpowiedni tryb\n• Opisz powód\n• Dołącz dowody (opcjonalnie)\n**Weryfikacja:**\n• Wybiorą werdykt: CZYSTY lub WYKRYTO CHEATY\n• Zgłoszenie auto-usunie się po 7 dniach')
+        .setDescription('Kliknij w przycisk poniżej, aby zgłosić gracza.\n\n**Zasady zgłoszeń:**\n• Podaj nick gracz lub jego incognito\n• Wybierz odpowiedni tryb\n• Opisz powód\n• Dołącz dowody (opcjonalnie)\n\n**Weryfikacja:**\n• Admini sprawdzą zgłoszenie\n• Wybiorą werdykt: CZYSTY lub WYKRYTO CHEATY\n• Zgłoszenie auto-usunie się po 7 dniach')
         .addFields(
             { name: '📌 Ważne', value: 'Fałszywe zgłoszenia będą karane!', inline: false },
             { name: '🎮 Tryby', value: '🌍 Earth | 🏠 Gildie | ⚔️ Lifesteal', inline: true },
+            { name: '⏱️ Czas odpowiedzi', value: 'Do 24 godzin', inline: true },
             { name: '📅 Auto-usunięcie', value: 'Po 7 dniach', inline: true }
         )
         .setFooter({ text: 'System zgłoszeniowy • v2.0' })
@@ -417,7 +410,7 @@ async function start() {
     
     const token = process.env.DISCORD_TOKEN;
     if (!token) {
-        console.error('❌ A2!');
+        console.error('❌ BRAK TOKENA!');
         process.exit(1);
     }
     
