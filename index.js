@@ -612,7 +612,7 @@ async function createReportPanel(interaction) {
     const allowedUserId = '1384938445394149406';
     
     // DEFER – zyskujemy czas na przetworzenie
-    await interaction.deferReply({ flags: 64 });
+    await interaction.deferReply();
     
     if (interaction.user.id !== allowedUserId) {
         return await interaction.editReply({
