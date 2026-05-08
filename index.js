@@ -168,7 +168,6 @@ async function handleButton(interaction) {
             return true;
         }
         
-        // KANAŁ DOCELOWY DLA ZGŁOSZEŃ
         const targetChannelId = '1501940360744669325';
         const targetChannel = interaction.guild.channels.cache.get(targetChannelId);
         
@@ -260,7 +259,6 @@ async function handleButton(interaction) {
             return true;
         }
         
-        // KANAŁ DOCELOWY DLA BACKUP
         const targetChannelId = '1501940107522085064';
         const targetChannel = interaction.guild.channels.cache.get(targetChannelId);
         const roleId = '1501944547494727842';
@@ -272,6 +270,7 @@ async function handleButton(interaction) {
             .addFields(
                 { name: '❌ Wystawił', value: `${interaction.user} (${interaction.user.username})`, inline: true },
                 { name: '📋 Powód', value: reportData.reason, inline: false },
+                { name: '🔍 Status', value: '⏳ Oczekuje na weryfikację', inline: true },
                 { name: '🕐 Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
             )
             .setFooter({ text: 'System backupowy • Zgłoszenie wymaga sprawdzenia' })
@@ -281,6 +280,12 @@ async function handleButton(interaction) {
             reportEmbed.addFields({ name: '🔗 Dowód', value: reportData.proof, inline: false });
         }
         
+        const adminRow = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder().setCustomId(`backup_clean_${interaction.user.id}`).setLabel('✅ Czysty').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId(`backup_cheats_${interaction.user.id}`).setLabel('⚠️ Wykryto cheaty').setStyle(ButtonStyle.Danger)
+            );
+        
         await interaction.reply({
             content: `✅ **Zgłoszenie BACKUP gracza ${reportData.playerNick} zostało wysłane!**\n\n**Podsumowanie:**\n🎮 Zgłoszony: ${reportData.playerNick}\n🎯 Tryb: ${fullModeName}\n📋 Powód: ${reportData.reason}\n\nOsoby odpowiedzialne za backup wkrótce sprawdzą zgłoszenie.`,
             flags: 64
@@ -288,22 +293,32 @@ async function handleButton(interaction) {
         
         if (targetChannel) {
             try {
-                await targetChannel.send({
+                const sentMessage = await targetChannel.send({
                     content: `<@&${roleId}> 📦 **NOWE ZGŁOSZENIE BACKUP**`,
-                    embeds: [reportEmbed]
+                    embeds: [reportEmbed],
+                    components: [adminRow]
                 });
+                
+                setTimeout(async () => {
+                    try {
+                        await sentMessage.delete();
+                        console.log(`🗑️ Auto-usunięto zgłoszenie BACKUP po 7 dniach`);
+                    } catch (e) {
+                        console.error('Błąd usuwania:', e);
+                    }
+                }, 7 * 24 * 60 * 60 * 1000);
+                
                 console.log(`✅ Zgłoszenie BACKUP wysłane na kanał ${targetChannelId} i pingnięto rolę ${roleId}`);
             } catch (error) {
                 console.error('❌ Błąd wysyłania na kanał backup:', error);
             }
         }
         
-        client.tempReports.delete(interaction.user.id);
         return true;
     }
     
-    // Obsługa przycisku "Czysty"
-    if (interaction.customId.startsWith('clean_')) {
+    // Obsługa przycisku "Czysty" (zwykłe)
+    if (interaction.customId.startsWith('clean_') && !interaction.customId.startsWith('backup_clean_')) {
         const userId = interaction.customId.split('_')[1];
         const reportData = client.tempReports.get(userId);
         
@@ -356,8 +371,8 @@ async function handleButton(interaction) {
         return true;
     }
     
-    // Obsługa przycisku "Wykryto cheaty"
-    if (interaction.customId.startsWith('cheats_')) {
+    // Obsługa przycisku "Wykryto cheaty" (zwykłe)
+    if (interaction.customId.startsWith('cheats_') && !interaction.customId.startsWith('backup_cheats_')) {
         const userId = interaction.customId.split('_')[1];
         const reportData = client.tempReports.get(userId);
         
@@ -393,6 +408,116 @@ async function handleButton(interaction) {
             const updatedEmbed = EmbedBuilder.from(originalEmbed)
                 .setColor(0xFF0000)
                 .setTitle('⚠️ SPRAWDZONE - WYKRYTO CHEATY');
+            
+            const fields = [...(updatedEmbed.data.fields || [])];
+            const statusIndex = fields.findIndex(f => f.name === '🔍 Status');
+            if (statusIndex !== -1) {
+                fields[statusIndex] = { name: '🔍 Status', value: '⚠️ Zweryfikowano - WYKRYTO CHEATY', inline: true };
+            }
+            updatedEmbed.setFields(fields);
+            
+            await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
+        } catch (error) {
+            console.error('❌ Błąd edycji embeda:', error);
+        }
+        
+        client.tempReports.delete(userId);
+        return true;
+    }
+    
+    // Obsługa przycisku "Czysty" dla BACKUP
+    if (interaction.customId.startsWith('backup_clean_')) {
+        const userId = interaction.customId.split('_')[2];
+        const reportData = client.tempReports.get(userId);
+        
+        const verdictChannelId = '1501940107522085064';
+        const verdictChannel = interaction.guild.channels.cache.get(verdictChannelId);
+        const roleId = '1501944547494727842';
+        
+        const verdictEmbed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('✅ Zgłoszenie BACKUP zweryfikowane')
+            .setDescription(`**Status:** Gracz jest CZYSTY`)
+            .addFields(
+                { name: 'Sprawdził', value: interaction.user.tag, inline: true },
+                { name: 'Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
+                { name: 'Werdict', value: '✅ Czysty', inline: true }
+            )
+            .setFooter({ text: 'System backupowy' })
+            .setTimestamp();
+        
+        if (verdictChannel && reportData) {
+            await verdictChannel.send({
+                content: `<@&${roleId}> ✅ **Werdykt wydany**\n<@${reportData.reporterId}>, Twoje zgłoszenie BACKUP gracza **${reportData.playerNick}** zostało sprawdzone!`,
+                embeds: [verdictEmbed]
+            });
+            console.log(`✅ Werdykt BACKUP wysłany na kanał ${verdictChannelId}`);
+        }
+        
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: `✅ Werdykt "Czysty" dla BACKUP został wysłany!`, flags: 64 });
+        }
+        
+        try {
+            const originalEmbed = interaction.message.embeds[0];
+            const updatedEmbed = EmbedBuilder.from(originalEmbed)
+                .setColor(0x00FF00)
+                .setTitle('✅ BACKUP - SPRAWDZONE - CZYSTY');
+            
+            const fields = [...(updatedEmbed.data.fields || [])];
+            const statusIndex = fields.findIndex(f => f.name === '🔍 Status');
+            if (statusIndex !== -1) {
+                fields[statusIndex] = { name: '🔍 Status', value: '✅ Zweryfikowano - CZYSTY', inline: true };
+            }
+            updatedEmbed.setFields(fields);
+            
+            await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
+        } catch (error) {
+            console.error('❌ Błąd edycji embeda:', error);
+        }
+        
+        client.tempReports.delete(userId);
+        return true;
+    }
+    
+    // Obsługa przycisku "Wykryto cheaty" dla BACKUP
+    if (interaction.customId.startsWith('backup_cheats_')) {
+        const userId = interaction.customId.split('_')[2];
+        const reportData = client.tempReports.get(userId);
+        
+        const verdictChannelId = '1501940107522085064';
+        const verdictChannel = interaction.guild.channels.cache.get(verdictChannelId);
+        const roleId = '1501944547494727842';
+        
+        const verdictEmbed = new EmbedBuilder()
+            .setColor(0xFF0000)
+            .setTitle('⚠️ Zgłoszenie BACKUP zweryfikowane')
+            .setDescription(`**Status:** WYKRYTO CHEATY!`)
+            .addFields(
+                { name: 'Sprawdził', value: interaction.user.tag, inline: true },
+                { name: 'Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
+                { name: 'Werdict', value: '⚠️ Wykryto cheaty', inline: true }
+            )
+            .setFooter({ text: 'System backupowy' })
+            .setTimestamp();
+        
+        if (verdictChannel && reportData) {
+            await verdictChannel.send({
+                content: `<@&${roleId}> ⚠️ **Werdykt wydany**\n<@${reportData.reporterId}>, Twoje zgłoszenie BACKUP gracza **${reportData.playerNick}** zostało sprawdzone!`,
+                embeds: [verdictEmbed]
+            });
+            console.log(`✅ Werdykt BACKUP wysłany na kanał ${verdictChannelId}`);
+        }
+        
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: `⚠️ Werdykt "Wykryto cheaty" dla BACKUP został wysłany!`, flags: 64 });
+        }
+        
+        try {
+            const originalEmbed = interaction.message.embeds[0];
+            const updatedEmbed = EmbedBuilder.from(originalEmbed)
+                .setColor(0xFF0000)
+                .setTitle('⚠️ BACKUP - SPRAWDZONE - WYKRYTO CHEATY');
             
             const fields = [...(updatedEmbed.data.fields || [])];
             const statusIndex = fields.findIndex(f => f.name === '🔍 Status');
@@ -498,7 +623,9 @@ async function createReportPanel(interaction) {
         .setTitle('📝 System zgłoszeń graczy')
         .setDescription('Kliknij w odpowiedni przycisk poniżej, aby zgłosić gracza.\n\n**Zasady zgłoszeń:**\n• Podaj nick gracza\n• Wybierz odpowiedni tryb\n• Opisz powód\n• Dołącz dowody (opcjonalnie)\n\n**Weryfikacja:**\n• Admini sprawdzą zgłoszenie\n• Wybiorą werdykt: CZYSTY lub WYKRYTO CHEATY\n• Zgłoszenie auto-usunie się po 7 dniach')
         .addFields(
+            { name: '📌 Ważne', value: 'Fałszywe zgłoszenia będą karane!', inline: false },
             { name: '🎮 Tryby', value: '🌍 Earth | 🏠 Gildie | ⚔️ Lifesteal', inline: true },
+            { name: '⏱️ Czas odpowiedzi', value: 'Do 24 godzin', inline: true },
             { name: '📅 Auto-usunięcie', value: 'Po 7 dniach', inline: true }
         )
         .setFooter({ text: 'System zgłoszeniowy • v2.0' })
