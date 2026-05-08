@@ -30,7 +30,7 @@ const client = new Client({
 });
 
 client.commands = new Collection();
-client.tempReports = new Map();
+client.tempReports = new Map(); // Do przechowywania tymczasowych zgłoszeń
 
 // ========== ŁADOWANIE KOMEND ==========
 async function loadCommands() {
@@ -95,7 +95,7 @@ async function handleButton(interaction) {
         return true;
     }
     
-    // Obsługa wyboru trybu (PRZYCISKI zamiast select menu)
+    // Obsługa wyboru trybu (PRZYCISKI)
     if (interaction.customId.startsWith('mode_')) {
         const parts = interaction.customId.split('_');
         const selectedModeRaw = parts[1];
@@ -142,7 +142,7 @@ async function handleButton(interaction) {
             return true;
         }
         
-        // KANAŁ DOCELOWY
+        // KANAŁ DOCELOWY DLA ZGŁOSZEŃ
         const targetChannelId = '1501940360744669325';
         const targetChannel = interaction.guild.channels.cache.get(targetChannelId);
         
@@ -204,7 +204,7 @@ async function handleButton(interaction) {
             flags: 64
         });
         
-        // Wyślij na kanał
+        // Wyślij na kanał zgłoszeń
         if (targetChannel) {
             try {
                 const sentMessage = await targetChannel.send({
@@ -238,7 +238,15 @@ async function handleButton(interaction) {
     
     // Obsługa przycisku "Czysty"
     if (interaction.customId.startsWith('clean_')) {
-        const cleanEmbed = new EmbedBuilder()
+        const userId = interaction.customId.split('_')[1];
+        const reportData = client.tempReports.get(userId);
+        
+        // Kanał do wysyłania werdyktu
+        const verdictChannelId = '1502426681317785751';
+        const verdictChannel = interaction.guild.channels.cache.get(verdictChannelId);
+        
+        // Przygotuj embed dla kanału werdyktów
+        const verdictEmbed = new EmbedBuilder()
             .setColor(0x00FF00)
             .setTitle('✅ Zgłoszenie zweryfikowane')
             .setDescription(`**Status:** Gracz jest CZYSTY`)
@@ -250,15 +258,42 @@ async function handleButton(interaction) {
             .setFooter({ text: 'System zgłoszeniowy' })
             .setTimestamp();
         
-        await interaction.reply({ embeds: [cleanEmbed] });
+        // Wyślij na kanał werdyktów i pingnij zgłaszającego
+        if (verdictChannel && reportData) {
+            await verdictChannel.send({
+                content: `<@${reportData.reporterId}>, Twoje zgłoszenie zostało sprawdzone!`,
+                embeds: [verdictEmbed]
+            });
+            console.log(`✅ Werdykt wysłany na kanał ${verdictChannelId} i pingnięto ${reportData.reporterTag}`);
+        } else if (verdictChannel) {
+            await verdictChannel.send({
+                content: `⚠️ Nie znaleziono danych zgłaszającego.`,
+                embeds: [verdictEmbed]
+            });
+        } else {
+            console.error(`❌ Nie znaleziono kanału ${verdictChannelId}`);
+        }
         
-        // Zmień embed
+        // Odpowiedź dla admina który kliknął przycisk
+        const cleanEmbed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('✅ Zgłoszenie zweryfikowane')
+            .setDescription(`**Status:** Gracz jest CZYSTY`)
+            .addFields(
+                { name: 'Sprawdził', value: interaction.user.tag, inline: true },
+                { name: 'Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
+                { name: 'Werdict', value: '✅ Czysty', inline: true }
+            )
+            .setTimestamp();
+        
+        await interaction.reply({ embeds: [cleanEmbed], flags: 64 });
+        
+        // Zmień orginalny embed na kanale zgłoszeń
         const originalEmbed = interaction.message.embeds[0];
         const updatedEmbed = EmbedBuilder.from(originalEmbed)
             .setColor(0x00FF00)
             .setTitle('✅ SPRAWDZONE - CZYSTY');
         
-        // Aktualizuj pole statusu
         const fields = [...updatedEmbed.data.fields];
         const statusIndex = fields.findIndex(f => f.name === '🔍 Status');
         if (statusIndex !== -1) {
@@ -267,12 +302,23 @@ async function handleButton(interaction) {
         updatedEmbed.setFields(fields);
         
         await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
+        
+        // Wyczyść dane tymczasowe
+        client.tempReports.delete(userId);
         return true;
     }
     
     // Obsługa przycisku "Wykryto cheaty"
     if (interaction.customId.startsWith('cheats_')) {
-        const cheatsEmbed = new EmbedBuilder()
+        const userId = interaction.customId.split('_')[1];
+        const reportData = client.tempReports.get(userId);
+        
+        // Kanał do wysyłania werdyktu
+        const verdictChannelId = '1502426681317785751';
+        const verdictChannel = interaction.guild.channels.cache.get(verdictChannelId);
+        
+        // Przygotuj embed dla kanału werdyktów
+        const verdictEmbed = new EmbedBuilder()
             .setColor(0xFF0000)
             .setTitle('⚠️ Zgłoszenie zweryfikowane')
             .setDescription(`**Status:** WYKRYTO CHEATY!`)
@@ -284,9 +330,37 @@ async function handleButton(interaction) {
             .setFooter({ text: 'System zgłoszeniowy' })
             .setTimestamp();
         
-        await interaction.reply({ embeds: [cheatsEmbed] });
+        // Wyślij na kanał werdyktów i pingnij zgłaszającego
+        if (verdictChannel && reportData) {
+            await verdictChannel.send({
+                content: `<@${reportData.reporterId}>, Twoje zgłoszenie zostało sprawdzone!`,
+                embeds: [verdictEmbed]
+            });
+            console.log(`✅ Werdykt wysłany na kanał ${verdictChannelId} i pingnięto ${reportData.reporterTag}`);
+        } else if (verdictChannel) {
+            await verdictChannel.send({
+                content: `⚠️ Nie znaleziono danych zgłaszającego.`,
+                embeds: [verdictEmbed]
+            });
+        } else {
+            console.error(`❌ Nie znaleziono kanału ${verdictChannelId}`);
+        }
         
-        // Zmień embed
+        // Odpowiedź dla admina który kliknął przycisk
+        const cheatsEmbed = new EmbedBuilder()
+            .setColor(0xFF0000)
+            .setTitle('⚠️ Zgłoszenie zweryfikowane')
+            .setDescription(`**Status:** WYKRYTO CHEATY!`)
+            .addFields(
+                { name: 'Sprawdził', value: interaction.user.tag, inline: true },
+                { name: 'Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
+                { name: 'Werdict', value: '⚠️ Wykryto cheaty', inline: true }
+            )
+            .setTimestamp();
+        
+        await interaction.reply({ embeds: [cheatsEmbed], flags: 64 });
+        
+        // Zmień orginalny embed na kanale zgłoszeń
         const originalEmbed = interaction.message.embeds[0];
         const updatedEmbed = EmbedBuilder.from(originalEmbed)
             .setColor(0xFF0000)
@@ -300,6 +374,9 @@ async function handleButton(interaction) {
         updatedEmbed.setFields(fields);
         
         await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
+        
+        // Wyczyść dane tymczasowe
+        client.tempReports.delete(userId);
         return true;
     }
     
@@ -315,14 +392,17 @@ async function handleModal(interaction) {
         const reason = interaction.fields.getTextInputValue('report_reason');
         const proof = interaction.fields.getTextInputValue('report_proof') || 'Brak dowodu';
         
+        // Zapisz dane zgłoszenia wraz z ID zgłaszającego
         client.tempReports.set(interaction.user.id, {
             playerNick,
             reason,
             proof,
+            reporterId: interaction.user.id,
+            reporterTag: interaction.user.tag,
             timestamp: Date.now()
         });
         
-        // UŻYCIE PRZYCISKÓW ZAMIAST SELECT MENU
+        // Przyciski do wyboru trybu
         const row = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
@@ -366,9 +446,7 @@ async function createReportPanel(interaction) {
         .setTitle('📝 System zgłoszeń graczy')
         .setDescription('Kliknij w przycisk poniżej, aby zgłosić gracza.\n\n**Zasady zgłoszeń:**\n• Podaj nick gracza\n• Wybierz odpowiedni tryb\n• Opisz powód\n• Dołącz dowody (opcjonalnie)\n\n**Weryfikacja:**\n• Admini sprawdzą zgłoszenie\n• Wybiorą werdykt: CZYSTY lub WYKRYTO CHEATY\n• Zgłoszenie auto-usunie się po 7 dniach')
         .addFields(
-            { name: '📌 Ważne', value: 'Fałszywe zgłoszenia będą karane!', inline: false },
             { name: '🎮 Tryby', value: '🌍 Earth | 🏠 Gildie | ⚔️ Lifesteal', inline: true },
-            { name: '⏱️ Czas odpowiedzi', value: 'Do 24 godzin', inline: true },
             { name: '📅 Auto-usunięcie', value: 'Po 7 dniach', inline: true }
         )
         .setFooter({ text: 'System zgłoszeniowy • v2.0' })
