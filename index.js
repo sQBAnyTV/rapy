@@ -30,7 +30,7 @@ const client = new Client({
 });
 
 client.commands = new Collection();
-client.tempReports = new Map(); // Do przechowywania tymczasowych zgłoszeń
+client.tempReports = new Map(); // Przechowuje dane zgłoszeń
 
 // ========== ŁADOWANIE KOMEND ==========
 async function loadCommands() {
@@ -198,9 +198,9 @@ async function handleButton(interaction) {
                     .setStyle(ButtonStyle.Danger)
             );
         
-        // ODPOWIEDZ UŻYTKOWNIKOWI
+        // ODPOWIEDZ UŻYTKOWNIKOWI - Z NICKIEM ZGŁOSZONEGO GRACZA
         await interaction.reply({
-            content: `✅ **Zgłoszenie zostało wysłane!**\n\n**Podsumowanie:**\n🎮 Nick: ${reportData.playerNick}\n🎯 Tryb: ${fullModeName}\n📋 Powód: ${reportData.reason}\n\nAdmini wkrótce sprawdzą zgłoszenie.`,
+            content: `✅ **Zgłoszenie gracza ${reportData.playerNick} zostało wysłane!**\n\n**Podsumowanie:**\n🎮 Zgłoszony: ${reportData.playerNick}\n🎯 Tryb: ${fullModeName}\n📋 Powód: ${reportData.reason}\n\nAdmini wkrótce sprawdzą zgłoszenie.`,
             flags: 64
         });
         
@@ -231,8 +231,7 @@ async function handleButton(interaction) {
             console.error(`❌ Nie znaleziono kanału ${targetChannelId}`);
         }
         
-        // Wyczyść dane tymczasowe
-        client.tempReports.delete(interaction.user.id);
+        // NIE USUWAMY DANYCH - zostają do momentu wydania werdyktu
         return true;
     }
     
@@ -261,7 +260,7 @@ async function handleButton(interaction) {
         // Wyślij na kanał werdyktów i pingnij zgłaszającego
         if (verdictChannel && reportData) {
             await verdictChannel.send({
-                content: `<@${reportData.reporterId}>, Twoje zgłoszenie zostało sprawdzone!`,
+                content: `<@${reportData.reporterId}>, Twoje zgłoszenie gracza **${reportData.playerNick}** zostało sprawdzone!`,
                 embeds: [verdictEmbed]
             });
             console.log(`✅ Werdykt wysłany na kanał ${verdictChannelId} i pingnięto ${reportData.reporterTag}`);
@@ -275,35 +274,33 @@ async function handleButton(interaction) {
         }
         
         // Odpowiedź dla admina który kliknął przycisk
-        const cleanEmbed = new EmbedBuilder()
-            .setColor(0x00FF00)
-            .setTitle('✅ Zgłoszenie zweryfikowane')
-            .setDescription(`**Status:** Gracz jest CZYSTY`)
-            .addFields(
-                { name: 'Sprawdził', value: interaction.user.tag, inline: true },
-                { name: 'Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
-                { name: 'Werdict', value: '✅ Czysty', inline: true }
-            )
-            .setTimestamp();
-        
-        await interaction.reply({ embeds: [cleanEmbed], flags: 64 });
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ 
+                content: `✅ Werdykt "Czysty" został wysłany!`, 
+                flags: 64 
+            });
+        }
         
         // Zmień orginalny embed na kanale zgłoszeń
-        const originalEmbed = interaction.message.embeds[0];
-        const updatedEmbed = EmbedBuilder.from(originalEmbed)
-            .setColor(0x00FF00)
-            .setTitle('✅ SPRAWDZONE - CZYSTY');
-        
-        const fields = [...updatedEmbed.data.fields];
-        const statusIndex = fields.findIndex(f => f.name === '🔍 Status');
-        if (statusIndex !== -1) {
-            fields[statusIndex] = { name: '🔍 Status', value: '✅ Zweryfikowano - CZYSTY', inline: true };
+        try {
+            const originalEmbed = interaction.message.embeds[0];
+            const updatedEmbed = EmbedBuilder.from(originalEmbed)
+                .setColor(0x00FF00)
+                .setTitle('✅ SPRAWDZONE - CZYSTY');
+            
+            const fields = [...(updatedEmbed.data.fields || [])];
+            const statusIndex = fields.findIndex(f => f.name === '🔍 Status');
+            if (statusIndex !== -1) {
+                fields[statusIndex] = { name: '🔍 Status', value: '✅ Zweryfikowano - CZYSTY', inline: true };
+            }
+            updatedEmbed.setFields(fields);
+            
+            await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
+        } catch (error) {
+            console.error('❌ Błąd edycji embeda:', error);
         }
-        updatedEmbed.setFields(fields);
         
-        await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
-        
-        // Wyczyść dane tymczasowe
+        // Usuń dane zgłoszenia dopiero po wydaniu werdyktu
         client.tempReports.delete(userId);
         return true;
     }
@@ -333,7 +330,7 @@ async function handleButton(interaction) {
         // Wyślij na kanał werdyktów i pingnij zgłaszającego
         if (verdictChannel && reportData) {
             await verdictChannel.send({
-                content: `<@${reportData.reporterId}>, Twoje zgłoszenie zostało sprawdzone!`,
+                content: `<@${reportData.reporterId}>, Twoje zgłoszenie gracza **${reportData.playerNick}** zostało sprawdzone!`,
                 embeds: [verdictEmbed]
             });
             console.log(`✅ Werdykt wysłany na kanał ${verdictChannelId} i pingnięto ${reportData.reporterTag}`);
@@ -347,35 +344,33 @@ async function handleButton(interaction) {
         }
         
         // Odpowiedź dla admina który kliknął przycisk
-        const cheatsEmbed = new EmbedBuilder()
-            .setColor(0xFF0000)
-            .setTitle('⚠️ Zgłoszenie zweryfikowane')
-            .setDescription(`**Status:** WYKRYTO CHEATY!`)
-            .addFields(
-                { name: 'Sprawdził', value: interaction.user.tag, inline: true },
-                { name: 'Data', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
-                { name: 'Werdict', value: '⚠️ Wykryto cheaty', inline: true }
-            )
-            .setTimestamp();
-        
-        await interaction.reply({ embeds: [cheatsEmbed], flags: 64 });
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ 
+                content: `⚠️ Werdykt "Wykryto cheaty" został wysłany!`, 
+                flags: 64 
+            });
+        }
         
         // Zmień orginalny embed na kanale zgłoszeń
-        const originalEmbed = interaction.message.embeds[0];
-        const updatedEmbed = EmbedBuilder.from(originalEmbed)
-            .setColor(0xFF0000)
-            .setTitle('⚠️ SPRAWDZONE - WYKRYTO CHEATY');
-        
-        const fields = [...updatedEmbed.data.fields];
-        const statusIndex = fields.findIndex(f => f.name === '🔍 Status');
-        if (statusIndex !== -1) {
-            fields[statusIndex] = { name: '🔍 Status', value: '⚠️ Zweryfikowano - WYKRYTO CHEATY', inline: true };
+        try {
+            const originalEmbed = interaction.message.embeds[0];
+            const updatedEmbed = EmbedBuilder.from(originalEmbed)
+                .setColor(0xFF0000)
+                .setTitle('⚠️ SPRAWDZONE - WYKRYTO CHEATY');
+            
+            const fields = [...(updatedEmbed.data.fields || [])];
+            const statusIndex = fields.findIndex(f => f.name === '🔍 Status');
+            if (statusIndex !== -1) {
+                fields[statusIndex] = { name: '🔍 Status', value: '⚠️ Zweryfikowano - WYKRYTO CHEATY', inline: true };
+            }
+            updatedEmbed.setFields(fields);
+            
+            await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
+        } catch (error) {
+            console.error('❌ Błąd edycji embeda:', error);
         }
-        updatedEmbed.setFields(fields);
         
-        await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
-        
-        // Wyczyść dane tymczasowe
+        // Usuń dane zgłoszenia dopiero po wydaniu werdyktu
         client.tempReports.delete(userId);
         return true;
     }
@@ -420,7 +415,7 @@ async function handleModal(interaction) {
             );
         
         await interaction.reply({
-            content: `📝 **Podsumowanie zgłoszenia:**\n\n🎮 **Nick:** ${playerNick}\n📋 **Powód:** ${reason}\n🔗 **Dowód:** ${proof}\n\n⬇️ **Kliknij w przycisk aby wybrać tryb gry:**`,
+            content: `📝 **Podsumowanie zgłoszenia:**\n\n🎮 **Zgłoszony gracz:** ${playerNick}\n📋 **Powód:** ${reason}\n🔗 **Dowód:** ${proof}\n\n⬇️ **Kliknij w przycisk aby wybrać tryb gry:**`,
             components: [row],
             flags: 64
         });
