@@ -2,6 +2,8 @@ const express = require('express');
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs').promises;
 const path = require('path');
+const { handleButton } = require('./components/buttons');
+const { handleModal } = require('./components/modals');
 
 // ========== SERVER KEEP-ALIVE ==========
 const app = express();
@@ -86,6 +88,16 @@ client.on('interactionCreate', async (interaction) => {
             });
         }
     }
+});
+
+// Obsługa przycisków
+client.on('interactionCreate', async (interaction) => {
+    await handleButton(interaction, client);
+});
+
+// Obsługa modali (formularzy)
+client.on('interactionCreate', async (interaction) => {
+    await handleModal(interaction, client);
 });
 
 // ========== URUCHOMIENIE ==========
