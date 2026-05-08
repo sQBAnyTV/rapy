@@ -1,5 +1,5 @@
 const express = require('express');
-const { Client, GatewayIntentBits, Collection, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -30,7 +30,7 @@ const client = new Client({
 });
 
 client.commands = new Collection();
-client.tempReports = new Map(); // Do przechowywania tymczasowych zgłoszeń
+client.tempReports = new Map();
 
 // ========== ŁADOWANIE KOMEND ==========
 async function loadCommands() {
@@ -95,9 +95,43 @@ async function handleButton(interaction) {
         return true;
     }
     
-    // Obsługa wyboru trybu
-    if (interaction.customId === 'mode_select') {
-        const selectedMode = interaction.values[0];
+    // Obsługa wyboru trybu (PRZYCISKI zamiast select menu)
+    if (interaction.customId.startsWith('mode_')) {
+        const parts = interaction.customId.split('_');
+        const selectedModeRaw = parts[1];
+        const userId = parts[2];
+        
+        // Sprawdź czy to ten sam użytkownik
+        if (interaction.user.id !== userId) {
+            await interaction.reply({
+                content: '❌ Nie możesz wybrać trybu dla cudzego zgłoszenia!',
+                flags: 64
+            });
+            return true;
+        }
+        
+        // Mapuj nazwę trybu
+        let selectedMode;
+        let modeEmoji;
+        switch(selectedModeRaw) {
+            case 'earth': 
+                selectedMode = 'Earth'; 
+                modeEmoji = '🌍';
+                break;
+            case 'gildie': 
+                selectedMode = 'Gildie'; 
+                modeEmoji = '🏠';
+                break;
+            case 'lifesteal': 
+                selectedMode = 'Lifesteal'; 
+                modeEmoji = '⚔️';
+                break;
+            default: 
+                selectedMode = 'Nieznany';
+                modeEmoji = '❓';
+        }
+        
+        const fullModeName = `${modeEmoji} ${selectedMode}`;
         const reportData = client.tempReports.get(interaction.user.id);
         
         if (!reportData) {
@@ -116,7 +150,7 @@ async function handleButton(interaction) {
         const reportEmbed = new EmbedBuilder()
             .setColor(0xFFA500)
             .setTitle('📋 Oczekiwanie na sprawdzenie')
-            .setDescription(`**Tryb:** ${selectedMode}\n**Nick:** ${reportData.playerNick}`)
+            .setDescription(`**Tryb:** ${fullModeName}\n**Nick:** ${reportData.playerNick}`)
             .addFields(
                 { 
                     name: '❌ Wystawił', 
@@ -147,13 +181,12 @@ async function handleButton(interaction) {
             .setFooter({ text: 'System zgłoszeniowy • Auto-usunie się za 7 dni' })
             .setTimestamp();
         
-        // Dodaj dowód jeśli został podany
         if (reportData.proof && reportData.proof !== 'Brak dowodu') {
             reportEmbed.addFields({ name: '🔗 Dowód', value: reportData.proof, inline: false });
         }
         
-        // Przyciski akcji
-        const row = new ActionRowBuilder()
+        // Przyciski dla adminów
+        const adminRow = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
                     .setCustomId(`clean_${interaction.user.id}`)
@@ -165,25 +198,26 @@ async function handleButton(interaction) {
                     .setStyle(ButtonStyle.Danger)
             );
         
-        // NAJPIERW ODPOWIEDZ UŻYTKOWNIKOWI
+        // ODPOWIEDZ UŻYTKOWNIKOWI
         await interaction.reply({
-            content: `✅ **Przetwarzanie zgłoszenia...**\n\nTwoje zgłoszenie zostało przyjęte. Admini wkrótce je sprawdzą.\n\n**Podsumowanie:**\n🎮 Nick: ${reportData.playerNick}\n🎯 Tryb: ${selectedMode}\n📋 Powód: ${reportData.reason}`,
+            content: `✅ **Zgłoszenie zostało wysłane!**\n\n**Podsumowanie:**\n🎮 Nick: ${reportData.playerNick}\n🎯 Tryb: ${fullModeName}\n📋 Powód: ${reportData.reason}\n\nAdmini wkrótce sprawdzą zgłoszenie.`,
             flags: 64
         });
         
-        // POTEM wyślij na kanał
+        // Wyślij na kanał
         if (targetChannel) {
             try {
                 const sentMessage = await targetChannel.send({
+                    content: `📢 **NOWE ZGŁOSZENIE**`,
                     embeds: [reportEmbed],
-                    components: [row]
+                    components: [adminRow]
                 });
                 
                 // Automatyczne usunięcie po 7 dniach
                 setTimeout(async () => {
                     try {
                         await sentMessage.delete();
-                        console.log(`🗑️ Automatycznie usunięto zgłoszenie po 7 dniach`);
+                        console.log(`🗑️ Auto-usunięto zgłoszenie po 7 dniach`);
                     } catch (e) {
                         console.error('Błąd usuwania:', e);
                     }
@@ -197,7 +231,7 @@ async function handleButton(interaction) {
             console.error(`❌ Nie znaleziono kanału ${targetChannelId}`);
         }
         
-        // Wyczyść tymczasowe dane
+        // Wyczyść dane tymczasowe
         client.tempReports.delete(interaction.user.id);
         return true;
     }
@@ -222,8 +256,15 @@ async function handleButton(interaction) {
         const originalEmbed = interaction.message.embeds[0];
         const updatedEmbed = EmbedBuilder.from(originalEmbed)
             .setColor(0x00FF00)
-            .setTitle('✅ SPRAWDZONE - CZYSTY')
-            .spliceFields(2, 1, { name: '🔍 Status', value: '✅ Zweryfikowano - CZYSTY', inline: true });
+            .setTitle('✅ SPRAWDZONE - CZYSTY');
+        
+        // Aktualizuj pole statusu
+        const fields = [...updatedEmbed.data.fields];
+        const statusIndex = fields.findIndex(f => f.name === '🔍 Status');
+        if (statusIndex !== -1) {
+            fields[statusIndex] = { name: '🔍 Status', value: '✅ Zweryfikowano - CZYSTY', inline: true };
+        }
+        updatedEmbed.setFields(fields);
         
         await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
         return true;
@@ -249,8 +290,14 @@ async function handleButton(interaction) {
         const originalEmbed = interaction.message.embeds[0];
         const updatedEmbed = EmbedBuilder.from(originalEmbed)
             .setColor(0xFF0000)
-            .setTitle('⚠️ SPRAWDZONE - WYKRYTO CHEATY')
-            .spliceFields(2, 1, { name: '🔍 Status', value: '⚠️ Zweryfikowano - WYKRYTO CHEATY', inline: true });
+            .setTitle('⚠️ SPRAWDZONE - WYKRYTO CHEATY');
+        
+        const fields = [...updatedEmbed.data.fields];
+        const statusIndex = fields.findIndex(f => f.name === '🔍 Status');
+        if (statusIndex !== -1) {
+            fields[statusIndex] = { name: '🔍 Status', value: '⚠️ Zweryfikowano - WYKRYTO CHEATY', inline: true };
+        }
+        updatedEmbed.setFields(fields);
         
         await interaction.message.edit({ embeds: [updatedEmbed], components: [] });
         return true;
@@ -275,34 +322,25 @@ async function handleModal(interaction) {
             timestamp: Date.now()
         });
         
-        const selectMenu = new StringSelectMenuBuilder()
-            .setCustomId('mode_select')
-            .setPlaceholder('🎮 Wybierz tryb gry')
-            .addOptions([
-                {
-                    label: 'Earth',
-                    description: 'Tryb Earth',
-                    value: '🌍 Earth',
-                    emoji: '🌍'
-                },
-                {
-                    label: 'Gildie',
-                    description: 'Tryb Gildie',
-                    value: '🏠 Gildie',
-                    emoji: '🏠'
-                },
-                {
-                    label: 'Lifesteal',
-                    description: 'Tryb Lifesteal',
-                    value: '⚔️ Lifesteal',
-                    emoji: '⚔️'
-                }
-            ]);
-        
-        const row = new ActionRowBuilder().addComponents(selectMenu);
+        // UŻYCIE PRZYCISKÓW ZAMIAST SELECT MENU
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`mode_earth_${interaction.user.id}`)
+                    .setLabel('🌍 Earth')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId(`mode_gildie_${interaction.user.id}`)
+                    .setLabel('🏠 Gildie')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId(`mode_lifesteal_${interaction.user.id}`)
+                    .setLabel('⚔️ Lifesteal')
+                    .setStyle(ButtonStyle.Primary)
+            );
         
         await interaction.reply({
-            content: `📝 **Podsumowanie zgłoszenia:**\n\n🎮 **Nick:** ${playerNick}\n📋 **Powód:** ${reason}\n🔗 **Dowód:** ${proof}\n\n⬇️ **Wybierz teraz tryb gry:**`,
+            content: `📝 **Podsumowanie zgłoszenia:**\n\n🎮 **Nick:** ${playerNick}\n📋 **Powód:** ${reason}\n🔗 **Dowód:** ${proof}\n\n⬇️ **Kliknij w przycisk aby wybrać tryb gry:**`,
             components: [row],
             flags: 64
         });
@@ -326,7 +364,7 @@ async function createReportPanel(interaction) {
     const embed = new EmbedBuilder()
         .setColor(0x2b2d31)
         .setTitle('📝 System zgłoszeń graczy')
-        .setDescription('Kliknij w przycisk poniżej, aby zgłosić gracza.\n\n**Zasady zgłoszeń:**\n• Podaj nick gracz lub jego incognito\n• Wybierz odpowiedni tryb\n• Opisz powód\n• Dołącz dowody (opcjonalnie)\n\n**Weryfikacja:**\n• Admini sprawdzą zgłoszenie\n• Wybiorą werdykt: CZYSTY lub WYKRYTO CHEATY\n• Zgłoszenie auto-usunie się po 7 dniach')
+        .setDescription('Kliknij w przycisk poniżej, aby zgłosić gracza.\n\n**Zasady zgłoszeń:**\n• Podaj nick gracza\n• Wybierz odpowiedni tryb\n• Opisz powód\n• Dołącz dowody (opcjonalnie)\n\n**Weryfikacja:**\n• Admini sprawdzą zgłoszenie\n• Wybiorą werdykt: CZYSTY lub WYKRYTO CHEATY\n• Zgłoszenie auto-usunie się po 7 dniach')
         .addFields(
             { name: '📌 Ważne', value: 'Fałszywe zgłoszenia będą karane!', inline: false },
             { name: '🎮 Tryby', value: '🌍 Earth | 🏠 Gildie | ⚔️ Lifesteal', inline: true },
@@ -374,7 +412,6 @@ client.on('interactionCreate', async (interaction) => {
                 });
             }
             
-            // Specjalna obsługa dla /sprawdz
             if (interaction.commandName === 'sprawdz') {
                 return await createReportPanel(interaction);
             }
