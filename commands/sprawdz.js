@@ -3,19 +3,17 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 module.exports = {
     name: 'sprawdz',
     description: 'Tworzy panel zgłoszeniowy dla graczy',
-    // Tylko dla autoryzowanych użytkowników
+    
     async execute(interaction, client) {
-        // 🔒 Sprawdź czy użytkownik ma uprawnienia (TWOJE ID)
         const allowedUserId = '1384938445394149406';
         
         if (interaction.user.id !== allowedUserId) {
             return await interaction.reply({
                 content: '❌ Nie masz uprawnień do użycia tej komendy!',
-                flags: 64  // ephemeral
+                flags: 64
             });
         }
         
-        // Embed z informacją
         const embed = new EmbedBuilder()
             .setColor(0x2b2d31)
             .setTitle('📝 System zgłoszeń graczy')
@@ -28,7 +26,6 @@ module.exports = {
             .setFooter({ text: 'System zgłoszeniowy • v1.0' })
             .setTimestamp();
         
-        // Przycisk
         const row = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
@@ -38,12 +35,9 @@ module.exports = {
                     .setEmoji('📋')
             );
         
-        // Wyślij panel na kanał
         await interaction.reply({
             embeds: [embed],
             components: [row]
         });
-        
-        console.log(`✅ Panel zgłoszeń utworzony przez ${interaction.user.tag}`);
     }
 };
