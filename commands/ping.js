@@ -1,11 +1,10 @@
+const { SlashCommandBuilder } = require('discord.js');
+
 module.exports = {
-    name: 'ping',
-    description: 'Sprawdza ping bota',
-    
-    async execute(interaction, client) {
-        await interaction.reply('🏓 Pong!');
-        
-        const ping = client.ws.ping;
-        await interaction.editReply(`🏓 Pong! ⏱️ ${ping}ms`);
+    data: new SlashCommandBuilder()
+        .setName('ping')
+        .setDescription('Sprawdź ping bota'),
+    async execute(interaction) {
+        await interaction.reply(`🏓 Pong! Ping: ${interaction.client.ws.ping}ms`);
     }
 };

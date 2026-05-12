@@ -1,17 +1,24 @@
 {
-  "name": "moj-bot-modularny",
+  "name": "rapygg",
   "version": "1.0.0",
-  "description": "Modułowy bot Discord",
+  "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sQBAnyTV/rapy.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/sQBAnyTV/rapy/issues"
+  },
+  "homepage": "https://github.com/sQBAnyTV/rapy#readme",
   "dependencies": {
-    "@discordjs/rest": "^2.6.1",
-    "discord.js": "^14.14.1",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "node-cron": "^3.0.3"
+    "discord.js": "^14.26.4"
   }
 }
